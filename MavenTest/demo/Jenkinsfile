@@ -61,22 +61,38 @@ pipeline {
             steps {
                 echo 'Building Docker image...'
                 script {
+                    def dockerAvailable = false
                     try {
-                        // Check if Docker is available
-                        bat 'docker --version'
-                        
-                        dir('MavenTest/demo') {
-                            // Use PowerShell for better Windows Docker integration
-                            powershell """
-                                \$env:DOCKERHUB_REPO = '${DOCKERHUB_REPO}'
-                                \$env:DOCKER_IMAGE_TAG = '${DOCKER_IMAGE_TAG}'
-                                docker build -t \$env:DOCKERHUB_REPO:\$env:DOCKER_IMAGE_TAG .
-                            """
+                        // Check if Docker daemon is accessible
+                        def result = bat(script: 'docker version', returnStatus: true)
+                        if (result == 0) {
+                            dockerAvailable = true
+                            echo "Docker is available and accessible"
                         }
                     } catch (Exception e) {
-                        echo "Docker build failed: ${e.getMessage()}"
-                        echo "This might be due to Docker daemon not running or insufficient permissions"
-                        echo "Please ensure Docker Desktop is running and Jenkins has proper permissions"
+                        echo "Docker daemon not accessible: ${e.getMessage()}"
+                    }
+                    
+                    if (dockerAvailable) {
+                        try {
+                            dir('MavenTest/demo') {
+                                bat """
+                                    docker build -t ${DOCKERHUB_REPO}:${DOCKER_IMAGE_TAG} .
+                                """
+                            }
+                            echo "Docker image built successfully"
+                        } catch (Exception e) {
+                            echo "Docker build failed: ${e.getMessage()}"
+                            currentBuild.result = 'UNSTABLE'
+                        }
+                    } else {
+                        echo "SKIPPING Docker build - Docker daemon not accessible"
+                        echo "This is likely due to insufficient privileges or Docker not running"
+                        echo "To fix this issue:"
+                        echo "1. Ensure Docker Desktop is running"
+                        echo "2. Run Jenkins as Administrator, or"
+                        echo "3. Add Jenkins service account to 'docker-users' group, or"
+                        echo "4. Configure Jenkins agent with Docker access"
                         currentBuild.result = 'UNSTABLE'
                     }
                 }
@@ -89,19 +105,32 @@ pipeline {
             steps {
                 echo 'Pushing Docker image to Docker Hub...'
                 script {
+                    def dockerAvailable = false
                     try {
-                        withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIALS_ID}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                            powershell """
-                                \$env:DOCKERHUB_REPO = '${DOCKERHUB_REPO}'
-                                \$env:DOCKER_IMAGE_TAG = '${DOCKER_IMAGE_TAG}'
-                                docker login -u \$env:DOCKER_USER -p \$env:DOCKER_PASS
-                                docker push \$env:DOCKERHUB_REPO:\$env:DOCKER_IMAGE_TAG
-                            """
+                        def result = bat(script: 'docker version', returnStatus: true)
+                        if (result == 0) {
+                            dockerAvailable = true
                         }
                     } catch (Exception e) {
-                        echo "Docker push failed: ${e.getMessage()}"
-                        echo "This might be due to Docker daemon not running or authentication issues"
-                        currentBuild.result = 'UNSTABLE'
+                        echo "Docker daemon not accessible for push: ${e.getMessage()}"
+                    }
+                    
+                    if (dockerAvailable) {
+                        try {
+                            withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIALS_ID}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                                bat """
+                                    echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
+                                    docker push ${DOCKERHUB_REPO}:${DOCKER_IMAGE_TAG}
+                                """
+                            }
+                            echo "Docker image pushed successfully"
+                        } catch (Exception e) {
+                            echo "Docker push failed: ${e.getMessage()}"
+                            currentBuild.result = 'UNSTABLE'
+                        }
+                    } else {
+                        echo "SKIPPING Docker push - Docker daemon not accessible"
+                        echo "Docker build was likely skipped due to access issues"
                     }
                 }
             }
