@@ -1,6 +1,15 @@
 pipeline {
     agent any
+        environment {
+            PATH = "C:\\Program Files\\Docker\\Docker\\resources\\bin;${env.PATH}"
 
+            // Define Docker Hub credentials ID
+            DOCKERHUB_CREDENTIALS_ID = 'Docker_Hub'
+            // Define Docker Hub repository name
+            DOCKERHUB_REPO = 'vernere/mavenTest'
+            // Define Docker image tag
+            DOCKER_IMAGE_TAG = 'latest'
+        }
     tools {
         maven 'Maven3' // Ensure Maven is installed and configured in Jenkins
     }
@@ -48,5 +57,20 @@ pipeline {
                 jacoco()
             }
         }
+                            steps {
+                        bat 'docker build -t %DOCKERHUB_REPO%:%DOCKER_IMAGE_TAG% .'
+                    }
+                }
+
+                stage('Push Docker Image to Docker Hub') {
+                    steps {
+                        withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIALS_ID}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                            bat '''
+                                docker login -u %DOCKER_USER% -p %DOCKER_PASS%
+                                docker push %DOCKERHUB_REPO%:%DOCKER_IMAGE_TAG%
+                            '''
+                        }
+                    }
+                }
     }
 }
