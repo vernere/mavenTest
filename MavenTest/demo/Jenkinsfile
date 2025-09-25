@@ -15,19 +15,25 @@ pipeline {
         stage('Build') {
             steps {
                 echo 'Building...'
-                bat 'mvn clean install'
+                dir('demo') {
+                    bat 'mvn clean install'
+                }
             }
         }
         stage('Test') {
             steps {
                 echo 'Testing...'
-                bat 'mvn test'
+                dir('demo') {
+                    bat 'mvn clean install'
+                }
             }
         }
         stage('Code coverage') {
             steps {
                 echo 'Calculating code coverage...'
-                bat 'mvn jacoco:report'
+                dir('demo') {
+                    bat 'mvn jacoco:report'
+                }
             }
         }
         stage('Publish test Reports') {
@@ -43,5 +49,4 @@ pipeline {
             }
         }
     }
-
 }
