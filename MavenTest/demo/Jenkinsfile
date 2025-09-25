@@ -2,14 +2,14 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven 3.8.1' // Ensure Maven is installed and configured in Jenkins
+        maven 'Maven3' // Ensure Maven is installed and configured in Jenkins
     }
 
     stages {
         stage('Checkout') {
             steps {
                 echo 'Checking out source code...'
-                git branch: 'main', url: 'https://github.com/vernere/JenkinsTest.git'
+                git branch: 'main', url: 'https://github.com/vernere/mavenTest.git'
             }
         }
         stage('Build') {
