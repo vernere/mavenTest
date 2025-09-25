@@ -60,19 +60,49 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 echo 'Building Docker image...'
-                dir('MavenTest/demo') {
-                    bat 'docker build -t %DOCKERHUB_REPO%:%DOCKER_IMAGE_TAG% .'
+                script {
+                    try {
+                        // Check if Docker is available
+                        bat 'docker --version'
+                        
+                        dir('MavenTest/demo') {
+                            // Use PowerShell for better Windows Docker integration
+                            powershell """
+                                \$env:DOCKERHUB_REPO = '${DOCKERHUB_REPO}'
+                                \$env:DOCKER_IMAGE_TAG = '${DOCKER_IMAGE_TAG}'
+                                docker build -t \$env:DOCKERHUB_REPO:\$env:DOCKER_IMAGE_TAG .
+                            """
+                        }
+                    } catch (Exception e) {
+                        echo "Docker build failed: ${e.getMessage()}"
+                        echo "This might be due to Docker daemon not running or insufficient permissions"
+                        echo "Please ensure Docker Desktop is running and Jenkins has proper permissions"
+                        currentBuild.result = 'UNSTABLE'
+                    }
                 }
             }
         }
         stage('Push Docker Image to Docker Hub') {
+            when {
+                expression { currentBuild.result != 'UNSTABLE' }
+            }
             steps {
                 echo 'Pushing Docker image to Docker Hub...'
-                withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIALS_ID}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    bat '''
-                        docker login -u %DOCKER_USER% -p %DOCKER_PASS%
-                        docker push %DOCKERHUB_REPO%:%DOCKER_IMAGE_TAG%
-                    '''
+                script {
+                    try {
+                        withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIALS_ID}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                            powershell """
+                                \$env:DOCKERHUB_REPO = '${DOCKERHUB_REPO}'
+                                \$env:DOCKER_IMAGE_TAG = '${DOCKER_IMAGE_TAG}'
+                                docker login -u \$env:DOCKER_USER -p \$env:DOCKER_PASS
+                                docker push \$env:DOCKERHUB_REPO:\$env:DOCKER_IMAGE_TAG
+                            """
+                        }
+                    } catch (Exception e) {
+                        echo "Docker push failed: ${e.getMessage()}"
+                        echo "This might be due to Docker daemon not running or authentication issues"
+                        currentBuild.result = 'UNSTABLE'
+                    }
                 }
             }
         }
