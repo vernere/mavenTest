@@ -15,7 +15,7 @@ pipeline {
         stage('Build') {
             steps {
                 echo 'Building...'
-                dir('demo') {
+                dir('MavenTest/demo') {
                     bat 'mvn clean install'
                 }
             }
@@ -23,15 +23,15 @@ pipeline {
         stage('Test') {
             steps {
                 echo 'Testing...'
-                dir('demo') {
-                    bat 'mvn clean install'
+                dir('MavenTest/demo') {
+                    bat 'mvn test'
                 }
             }
         }
         stage('Code coverage') {
             steps {
                 echo 'Calculating code coverage...'
-                dir('demo') {
+                dir('MavenTest/demo') {
                     bat 'mvn jacoco:report'
                 }
             }
@@ -39,7 +39,7 @@ pipeline {
         stage('Publish test Reports') {
             steps {
                 echo 'Publishing reports...'
-                junit '**/target/surefire-reports/*.xml'
+                junit 'MavenTest/demo/target/surefire-reports/*.xml'
             }
         }
         stage('publish coverage reports') {
